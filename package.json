@@ -1,0 +1,30 @@
+package name: (bamazon-master) 
+version: (1.0.0) 
+description: Products
+entry point: (BamazonCustomer.js) 
+test command: 
+git repository: https://github.com/Jdelta9/Bamazon.git
+keywords: 
+author: 
+license: (ISC) 
+About to write to /Users/JessicaCervantes/Documents/Bamazon-master/package.json:
+
+{
+  "name": "bamazon-master",
+  "version": "1.0.0",
+  "description": "Products",
+  "main": "BamazonCustomer.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Jdelta9/Bamazon.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Jdelta9/Bamazon/issues"
+  },
+  "homepage": "https://github.com/Jdelta9/Bamazon#readme"
+}
