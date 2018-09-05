@@ -1,159 +1,138 @@
+// Initializes the npm packages used
 var mysql = require("mysql");
-var table = require("console.table");
 var inquirer = require("inquirer");
+require("console.table");
 
+// Initializes the connection variable to sync with a MySQL database
 var connection = mysql.createConnection({
     host: "localhost",
+
+    // Your port; if not 3306
     port: 3306,
 
-    user: "Jessica",
+    // Your username
+    user: "root",
 
-    password: "NULL",
-    database: "Bamazon_DB"
-
+    // Your password
+    password: "",
+    database: "BAMAZON"
 });
 
+// Creates the connection with the server and loads the product data upon a successful connection
+connection.connect(function (err) {
+    if (err) {
+        console.error("error connecting: " + err.stack);
+    }
+    loadProducts();
+});
 
-function renderTable() {
-    connection.connect(function (err) {
+// Function to load the products table from the database and print results to the console
+function loadProducts() {
+    // Selects all of the data from the MySQL products table
+    connection.query("SELECT * FROM products", function (err, res) {
+        if (err) throw err;
 
-        connection.query("SELECT * FROM products", function (err, res) {
-            if (err) throw err
-            else console.table(res, "\n");
-            inquireThisId();
-        });
+        // Draw the table in the terminal using the response
+        console.table(res);
+
+        // Then prompt the customer for their choice of product, pass all the products to promptCustomerForItem
+        promptCustomerForItem(res);
     });
 }
-renderTable();
 
-
-function inquireThisId() {
-
-    inquirer.prompt([
-
-        {
-            type: "input",
-            name: "id",
-            message: "Please enter a valid Item ID number.\n",
-            validate: function (value) {
-                if (!isNaN(value) && value < 11) {
-                    return true;
+// Prompt the customer for a product ID
+function promptCustomerForItem(inventory) {
+    // Prompts user for what they would like to purchase
+    inquirer
+        .prompt([
+            {
+                type: "input",
+                name: "choice",
+                message: "What is the ID of the item you would you like to purchase? [Quit with Q]",
+                validate: function (val) {
+                    return !isNaN(val) || val.toLowerCase() === "q";
                 }
-                return false;
             }
-        },
+        ])
+        .then(function (val) {
+            // Check if the user wants to quit the program
+            checkIfShouldExit(val.choice);
+            var choiceId = parseInt(val.choice);
+            var product = checkInventory(choiceId, inventory);
 
-        {
-            type: "input",
-            name: "quant",
-            message: "How many of these items would you like to buy? \n",
-            validate: function (value) {
-                if (!isNaN(value)) {
-                    return true;
-                }
-                return false;
+            // If there is a product with the id the user chose, prompt the customer for a desired quantity
+            if (product) {
+                // Pass the chosen product to promptCustomerForQuantity
+                promptCustomerForQuantity(product);
             }
-        }
-
-    ]).then(function (answer) {
-
-        //console.log("Answer: ", answer);
-
-        var userId = answer.id;
-        console.log("Chosen item id: ", userId);
-
-        var userQuant = answer.quant;
-        console.log("Chosen quantity from stock: ", userQuant, "\n");
-
-        connection.query("SELECT * FROM products WHERE ?", [{ item_id: answer.id }], function (err, res) {
-            if (err) throw err;
-            //grab the item_id from the table that matches
-            //return the item_id
-            console.table(res);
-            var current_quantity = res[0].stock_quantity;
-            console.log("Current quantity in stock: ", current_quantity);
-            var price = res[0].price;
-            var remaining_quantity = current_quantity - answer.quant;
-            console.log("Remaining quantity in stock: ", remaining_quantity);
-
-            if (current_quantity > answer.quant) {
-
-                console.log("Amount Remaining: " + remaining_quantity);
-                console.log("Total Cost: " + (answer.quant * price) + "\n");
-
-                connection.query("UPDATE products SET stock_quantity=? WHERE item_id=?",
-                    [
-                        remaining_quantity, answer.id
-                    ],
-
-                    // connection.query("UPDATE products SET stock_quantity=? WHERE item_id?",
-                    // 	[remaining_quantity, answer.id],
-
-                    function (err, res) {
-                        console.table(res);
-                    });
-
-                connection.query("SELECT * FROM products", function (err, res) {
-
-                    console.log("Here is an updated inventory: ");
-                    console.log("------------------------------- \n");
-                    console.table(res);
-                });
-
-            } else {
-                console.log("Insufficient amounts, please try again!");
+            else {
+                // Otherwise let them know the item is not in the inventory, re-run loadProducts
+                console.log("\nThat item is not in the inventory.");
+                loadProducts();
             }
-
-            connection.end();
-
         });
-    })
-
 }
 
+// Prompt the customer for a product quantity
+function promptCustomerForQuantity(product) {
+    inquirer
+        .prompt([
+            {
+                type: "input",
+                name: "quantity",
+                message: "How many would you like? [Quit with Q]",
+                validate: function (val) {
+                    return val > 0 || val.toLowerCase() === "q";
+                }
+            }
+        ])
+        .then(function (val) {
+            // Check if the user wants to quit the program
+            checkIfShouldExit(val.quantity);
+            var quantity = parseInt(val.quantity);
 
+            // If there isn't enough of the chosen product and quantity, let the user know and re-run loadProducts
+            if (quantity > product.stock_quantity) {
+                console.log("\nInsufficient quantity!");
+                loadProducts();
+            }
+            else {
+                // Otherwise run makePurchase, give it the product information and desired quantity to purchase
+                makePurchase(product, quantity);
+            }
+        });
+}
 
-//Random Pseudo-coding comments:
-// function compareId(parseId) {
-// 	connection.query("SELECT * FROM products WHERE ?", { item_id : parseId }, function(err, data) {
-// 		if (err) throw err;
+// Purchase the desired quantity of the desired item
+function makePurchase(product, quantity) {
+    connection.query(
+        "UPDATE products SET stock_quantity = stock_quantity - ? WHERE item_id = ?",
+        [quantity, product.item_id],
+        function (err, res) {
+            // Let the user know the purchase was successful, re-run loadProducts
+            console.log("\nSuccessfully purchased " + quantity + " " + product.product_name + "'s!");
+            loadProducts();
+        }
+    );
+}
 
-// 		//grab the item_id from the table that matches
-// 		//return the item_id
-// 		console.log(data);
-// 	})
-// }
+// Check to see if the product the user chose exists in the inventory
+function checkInventory(choiceId, inventory) {
+    for (var i = 0; i < inventory.length; i++) {
+        if (inventory[i].item_id === choiceId) {
+            // If a matching product is found, return the product
+            return inventory[i];
+        }
+    }
+    // Otherwise return null
+    return null;
+}
 
-// function compareStock(parseQuant) {
-// 	connection.query("SELECT * FROM products WHERE stock_quantity=" + parseQuant), function(err, data) {
-// 		if(err) throw err;
-// 		//grab the stock_quantity from table that matches parseQuant
-// 		//subtract parseQuant from stock_quantity value
-// 		console.log(data);
-// 	}
-// }
-
-// 			//if(parseInt(answer.quant) <= VALUE of stock_quantity in answer.id of products) {
-
-				//subtract parseInt(answer.quant) from stock_quantity ---> (var remain = stock_quantity - parseInt(answer.quant));
-
-				//connection.query("UPDATE in products (stock_quantity) WHERE (answer.id = item_id) and VALUE is (remain)");
-
-				//multiply parseInt(answer.quant) to VALUE price in answer.id of products ---> (var costTot = price * parseInt(answer.quant))
-
-				//connection.query("UPDATE in products (price) WHERE (answer.id = item_id) and VALUE is (costTOT)");
-
-				//save the updated table to mysql and to the screen
-				//console.log this new table to the screen
-
-			// else if (parseInt(answer.quant) <= VALUE of stock_quantity in answer.id of products) {
-				//console.log("Insufficient quantity!")
-				//process.exit();
-			//}
-
-
-		//});
-
-//}
-
-//connection.end();
+// Check to see if the user wants to quit the program
+function checkIfShouldExit(choice) {
+    if (choice.toLowerCase() === "q") {
+        // Log a message and exit the current node process
+        console.log("Goodbye!");
+        process.exit(0);
+    }
+}
